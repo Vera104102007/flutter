@@ -1,0 +1,46 @@
+# Simple workflow for deploying static content to GitHub Pages
+name: Make apk file
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Build flutter apk
+      uses: subosito/flutter-action@v2.14.0
+      with:
+        flutter-version: "3.47.4"
+    - run: flutter pub get
+
+    - run: flutter create .
+    - run: flutter build apk --release
+    
+    - name: Upload artifacts
+    
+      uses: actions/upload-artifact@v7
+      with:
+          name: flutter-apk
+          path: build/
+    
