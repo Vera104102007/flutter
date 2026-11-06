@@ -34,6 +34,35 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:536514315583:android:614f70874f27d738923f8a",
+        "android_client_info": {
+          "package_name": "com.vottakaya.sobachka"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "536514315583-j3scokk489n49mf0kc7ckmncfjteklip.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvlumF__BF_ie8LqX3LAC7tPbl_DFKXLM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "536514315583-j3scokk489n49mf0kc7ckmncfjteklip.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

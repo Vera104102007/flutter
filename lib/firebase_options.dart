@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBvlumF__BF_ie8LqX3LAC7tPbl_DFKXLM',
-    appId: '1:536514315583:android:b68f4c09905ac83b923f8a',
+    appId: '1:536514315583:android:614f70874f27d738923f8a',
     messagingSenderId: '536514315583',
     projectId: 'flutter-app-982b4',
     databaseURL: 'https://flutter-app-982b4-default-rtdb.firebaseio.com',
