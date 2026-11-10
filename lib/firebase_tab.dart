@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -21,17 +23,85 @@ class _FirebaseTabState extends State<FirebaseTab> {
   /// Вход через ВК или Яндекс — Firebase о нём не знает.
   SocialUser? _social;
 
+  /// Роль из ветки profiles: 'user' или 'admin'.
+  String _role = 'user';
+
+  /// Этот вход — первый для аккаунта.
+  bool _firstVisit = false;
+
+  StreamSubscription<User?>? _roleSub;
+
   @override
   void initState() {
     super.initState();
+    if (!widget.ready) return;
+
     // Заранее открываем соединение с базой, пока человек только вводит
     // логин. Firebase держит связь по веб-сокету с сервером в США, и его
     // установка занимает несколько секунд. Узел .info/connected читается
     // без входа, поэтому годится, чтобы «разогреть» соединение заранее —
     // иначе эти секунды пришлось бы ждать уже после входа, глядя
     // на крутящийся индикатор вместо таблицы.
-    if (widget.ready) {
-      FirebaseDatabase.instance.ref('.info/connected').once().ignore();
+    FirebaseDatabase.instance.ref('.info/connected').once().ignore();
+
+    _roleSub = _auth.authStateChanges().listen((user) {
+      if (user == null) {
+        if (mounted) {
+          setState(() {
+            _role = 'user';
+            _firstVisit = false;
+          });
+        }
+      } else {
+        _loadProfile(user);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _roleSub?.cancel();
+    super.dispose();
+  }
+
+  /// Читает профиль пользователя, а при первом входе создаёт его.
+  ///
+  /// Первый ли это вход, Firebase сообщает сам: у пользователя есть
+  /// отметки о создании аккаунта и о последнем входе. Если они совпадают,
+  /// пользователь только что зарегистрировался.
+  Future<void> _loadProfile(User user) async {
+    final created = user.metadata.creationTime;
+    final lastSignIn = user.metadata.lastSignInTime;
+    final first = created != null &&
+        lastSignIn != null &&
+        lastSignIn.difference(created).inSeconds.abs() < 5;
+
+    var role = 'user';
+    try {
+      final ref = FirebaseDatabase.instance.ref('profiles/${user.uid}');
+      final snapshot = await ref.get();
+      if (!snapshot.exists) {
+        // Первый вход — заводим профиль. Роль здесь всегда обычная:
+        // правила базы не дают приложению записать сюда 'admin',
+        // эту роль выдаёт владелец проекта вручную в консоли.
+        await ref.set({
+          'email': user.email,
+          'role': 'user',
+          'createdAt': ServerValue.timestamp,
+        });
+      } else {
+        final value = snapshot.value;
+        if (value is Map) role = '${value['role'] ?? 'user'}';
+      }
+    } catch (e) {
+      debugPrint('Не удалось прочитать профиль: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _role = role;
+        _firstVisit = first;
+      });
     }
   }
 
@@ -51,6 +121,11 @@ class _FirebaseTabState extends State<FirebaseTab> {
   /// INSERT — push() создаёт запись с уникальным ключом.
   Future<void> _add(String username, String password) =>
       _ref.push().set({'username': username, 'password': password});
+
+  /// DELETE — удалить запись по её ключу. Разрешено только администратору:
+  /// это проверяется и здесь (кнопки просто нет), и в правилах базы.
+  Future<void> _delete(Map<String, dynamic> row) =>
+      _ref.child('${row['key']}').remove();
 
   /// Вход через провайдера Firebase (Google, GitHub).
   Future<void> _oauth(AuthProvider provider) => _friendly(() async {
@@ -147,15 +222,28 @@ class _FirebaseTabState extends State<FirebaseTab> {
 
   /// Превращает данные Firebase в список для таблицы.
   /// Firebase отдаёт Map «ключ → запись» или List, если ключи 0, 1, 2...
+  /// Ключ запоминаем: по нему потом удаляется строка.
   List<Map<String, dynamic>> _parse(Object? value) {
-    final items = value is Map
-        ? value.values
-        : (value is List ? value : const <dynamic>[]);
-    return [
-      for (final item in items)
-        if (item is Map)
-          {'username': item['username'], 'password': item['password']},
-    ];
+    final rows = <Map<String, dynamic>>[];
+
+    void add(Object? key, Object? item) {
+      if (item is Map) {
+        rows.add({
+          'key': '$key',
+          'username': item['username'],
+          'password': item['password'],
+        });
+      }
+    }
+
+    if (value is Map) {
+      value.forEach(add);
+    } else if (value is List) {
+      for (var i = 0; i < value.length; i++) {
+        add(i, value[i]);
+      }
+    }
+    return rows;
   }
 
   @override
@@ -187,6 +275,8 @@ class _FirebaseTabState extends State<FirebaseTab> {
 
         return HomeScreen(
           name: _nameOf(user),
+          role: _role,
+          firstVisit: _firstVisit,
           onSignOut: _signOut,
           onAdd: _add,
           listTitle: 'Список пользователей (обновляется сам)',
@@ -214,7 +304,10 @@ class _FirebaseTabState extends State<FirebaseTab> {
                   ),
                 );
               }
-              return UsersTable(users: _parse(event.data!.snapshot.value));
+              return UsersTable(
+                users: _parse(event.data!.snapshot.value),
+                onDelete: _role == 'admin' ? _delete : null,
+              );
             },
           ),
         );

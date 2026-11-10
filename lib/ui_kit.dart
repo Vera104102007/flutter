@@ -174,6 +174,8 @@ class HomeScreen extends StatelessWidget {
     required this.list,
     this.listTitle = 'Список пользователей',
     this.onRefresh,
+    this.role = 'user',
+    this.firstVisit = false,
   });
 
   final String name;
@@ -182,6 +184,14 @@ class HomeScreen extends StatelessWidget {
   final Widget list;
   final String listTitle;
   final VoidCallback? onRefresh;
+
+  /// 'admin' или 'user'. От роли зависит, можно ли удалять записи.
+  final String role;
+
+  /// Этот вход — первый для данного аккаунта.
+  final bool firstVisit;
+
+  bool get isAdmin => role == 'admin';
 
   @override
   Widget build(BuildContext context) {
@@ -208,6 +218,33 @@ class HomeScreen extends StatelessWidget {
                   icon: const Icon(Icons.logout),
                   label: const Text('Выйти'),
                 ),
+              ],
+            ),
+            Row(
+              children: [
+                const SizedBox(width: 32),
+                Icon(
+                  isAdmin ? Icons.shield : Icons.person_outline,
+                  size: 16,
+                  color: isAdmin ? Colors.indigo : Colors.grey,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isAdmin ? 'Роль: администратор' : 'Роль: обычный пользователь',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isAdmin ? Colors.indigo : Colors.grey,
+                  ),
+                ),
+                if (firstVisit) ...[
+                  const SizedBox(width: 12),
+                  const Icon(Icons.fiber_new, size: 16, color: Colors.green),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Первый вход',
+                    style: TextStyle(fontSize: 13, color: Colors.green),
+                  ),
+                ],
               ],
             ),
             const Divider(),
@@ -317,20 +354,86 @@ class _AddUserFormState extends State<AddUserForm> {
   }
 }
 
-/// Таблица пользователей: №, Логин, Пароль.
-class UsersTable extends StatelessWidget {
-  const UsersTable({super.key, required this.users});
+/// Таблица пользователей: Логин и Пароль.
+///
+/// По заголовку столбца можно сортировать — нажатие переключает
+/// направление. Кнопка удаления появляется, только если вкладка передала
+/// функцию onDelete: она это делает лишь для администратора.
+class UsersTable extends StatefulWidget {
+  const UsersTable({super.key, required this.users, this.onDelete});
 
   final List<Map<String, dynamic>> users;
+  final Future<void> Function(Map<String, dynamic> row)? onDelete;
+
+  @override
+  State<UsersTable> createState() => _UsersTableState();
+}
+
+class _UsersTableState extends State<UsersTable> {
+  static const _keys = ['username', 'password'];
+
+  int _column = 0;
+  bool _ascending = true;
+
+  List<Map<String, dynamic>> get _sorted {
+    final key = _keys[_column];
+    final rows = [...widget.users];
+    rows.sort((a, b) {
+      final left = '${a[key] ?? ''}'.toLowerCase();
+      final right = '${b[key] ?? ''}'.toLowerCase();
+      return _ascending ? left.compareTo(right) : right.compareTo(left);
+    });
+    return rows;
+  }
+
+  void _sort(int column, bool ascending) {
+    setState(() {
+      _column = column;
+      _ascending = ascending;
+    });
+  }
+
+  Future<void> _confirmDelete(Map<String, dynamic> row) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить пользователя?'),
+        content: Text(
+          'Запись «${row['username'] ?? ''}» будет удалена из базы. '
+          'Отменить это нельзя.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true) return;
+
+    try {
+      await widget.onDelete!(row);
+      if (mounted) showMessage(context, 'Пользователь удалён');
+    } catch (e) {
+      if (mounted) showMessage(context, 'Не удалось удалить: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (users.isEmpty) {
+    if (widget.users.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(24),
         child: Center(child: Text('Пока пусто')),
       );
     }
+
+    final rows = _sorted;
 
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -338,18 +441,29 @@ class UsersTable extends StatelessWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(minWidth: constraints.maxWidth),
           child: DataTable(
-            columns: const [
-              DataColumn(label: Text('№')),
-              DataColumn(label: Text('Логин')),
-              DataColumn(label: Text('Пароль')),
+            sortColumnIndex: _column,
+            sortAscending: _ascending,
+            columns: [
+              DataColumn(label: const Text('Логин'), onSort: _sort),
+              DataColumn(label: const Text('Пароль'), onSort: _sort),
+              if (widget.onDelete != null)
+                const DataColumn(label: Text('')),
             ],
             rows: [
-              for (var i = 0; i < users.length; i++)
+              for (final row in rows)
                 DataRow(
                   cells: [
-                    DataCell(Text('${i + 1}')),
-                    DataCell(Text('${users[i]['username'] ?? ''}')),
-                    DataCell(Text('${users[i]['password'] ?? ''}')),
+                    DataCell(Text('${row['username'] ?? ''}')),
+                    DataCell(Text('${row['password'] ?? ''}')),
+                    if (widget.onDelete != null)
+                      DataCell(
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          color: Colors.red,
+                          tooltip: 'Удалить',
+                          onPressed: () => _confirmDelete(row),
+                        ),
+                      ),
                   ],
                 ),
             ],

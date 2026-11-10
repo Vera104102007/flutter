@@ -190,6 +190,25 @@ firebase deploy --only hosting
 Код лежит в `lib/oauth_window_web.dart` (браузер) и
 `lib/oauth_window_io.dart` (телефон); нужный файл подставляется при сборке.
 
+## 5а. Имя пакета Android и сборка APK
+
+Проект собирается в APK автоматически через `.github/workflows/main.yml`.
+После подключения Firebase сборка один раз упала:
+
+> Execution failed for task `:app:processReleaseGoogleServices`.
+> No matching client found for package name `com.vottakaya.sobachka`
+
+Плагин `google-services` сверяет `applicationId` из `build.gradle.kts`
+с файлом `google-services.json`, а тот был выписан только на старое имя
+пакета `com.example.my_first_flutter_app`.
+
+Исправлено так: в проект Firebase добавлено второе Android-приложение
+с пакетом `com.vottakaya.sobachka`, его клиент дописан в
+`google-services.json`. Идентификаторы в `firebase_options.dart`
+и `firebase.json` обновлены на новый.
+
+То есть имя пакета осталось твоим, ничего откатывать не пришлось.
+
 ## 6а. Почему таблица Firebase загружается дольше, чем Supabase
 
 Это не ошибка в коде, а расстояние до сервера. Замерила из браузера

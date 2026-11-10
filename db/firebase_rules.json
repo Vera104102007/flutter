@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "Users": {
+      ".read": "auth != null",
+      "$row": {
+        ".write": "auth != null && (newData.exists() || root.child('profiles').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && (!data.exists() ? newData.child('role').val() === 'user' : newData.child('role').val() === data.child('role').val())"
+      }
+    }
+  }
+}

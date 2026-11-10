@@ -27,6 +27,12 @@ class _SupabaseTabState extends State<SupabaseTab> {
 
   List<Map<String, dynamic>> _users = [];
 
+  /// Роль из таблицы profiles: 'user' или 'admin'.
+  String _role = 'user';
+
+  /// Этот вход — первый для аккаунта.
+  bool _firstVisit = false;
+
   bool get _signedIn => _session != null || _social != null;
 
   @override
@@ -35,13 +41,56 @@ class _SupabaseTabState extends State<SupabaseTab> {
 
     // Если вход уже был выполнен раньше — например, вернулись со страницы Google.
     _session = _db.auth.currentSession;
-    if (_session != null) _load();
+    if (_session != null) _afterSignIn(_session!);
 
     _authSub = _db.auth.onAuthStateChange.listen((state) {
       if (!mounted) return;
       setState(() => _session = state.session);
-      if (state.session != null) _load();
+      if (state.session != null) {
+        _afterSignIn(state.session!);
+      } else {
+        setState(() {
+          _role = 'user';
+          _firstVisit = false;
+        });
+      }
     });
+  }
+
+  void _afterSignIn(Session session) {
+    setState(() => _firstVisit = _isFirstVisit(session.user));
+    _load();
+    _loadRole();
+  }
+
+  /// Первый ли это вход. Supabase хранит у пользователя две отметки:
+  /// когда аккаунт создан и когда он входил в последний раз. Если они
+  /// совпадают, значит пользователь только что зарегистрировался.
+  bool _isFirstVisit(User user) {
+    final created = DateTime.tryParse(user.createdAt);
+    final lastSignIn = DateTime.tryParse(user.lastSignInAt ?? '');
+    if (created == null || lastSignIn == null) return false;
+    return lastSignIn.difference(created).inSeconds.abs() < 5;
+  }
+
+  /// Роль лежит в таблице profiles. Её строки создаёт триггер базы данных
+  /// при регистрации, а менять роль может только администратор проекта —
+  /// у приложения прав на запись в profiles нет.
+  Future<void> _loadRole() async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      if (mounted) setState(() => _role = 'user');
+      return;
+    }
+    try {
+      final rows =
+          await _db.from('profiles').select('role').eq('id', userId).limit(1);
+      final role = rows.isEmpty ? 'user' : '${rows.first['role'] ?? 'user'}';
+      if (mounted) setState(() => _role = role);
+    } catch (e) {
+      // Таблицы profiles может не быть — тогда считаем роль обычной.
+      if (mounted) setState(() => _role = 'user');
+    }
   }
 
   @override
@@ -67,6 +116,13 @@ class _SupabaseTabState extends State<SupabaseTab> {
   /// INSERT — добавить строку по нажатию кнопки.
   Future<void> _add(String username, String password) async {
     await _db.from('Users').insert({'username': username, 'password': password});
+    await _load();
+  }
+
+  /// DELETE — удалить строку. Разрешено только администратору: это
+  /// проверяется и здесь (кнопки просто нет), и в самой базе правилом RLS.
+  Future<void> _delete(Map<String, dynamic> row) async {
+    await _db.from('Users').delete().eq('id', row['id'] as Object);
     await _load();
   }
 
@@ -163,10 +219,15 @@ class _SupabaseTabState extends State<SupabaseTab> {
 
     return HomeScreen(
       name: _name,
+      role: _role,
+      firstVisit: _firstVisit,
       onSignOut: _signOut,
       onAdd: _add,
       onRefresh: _load,
-      list: UsersTable(users: _users),
+      list: UsersTable(
+        users: _users,
+        onDelete: _role == 'admin' ? _delete : null,
+      ),
     );
   }
 }
