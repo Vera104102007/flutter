@@ -50,6 +50,12 @@ class _FirebaseTabState extends State<FirebaseTab> {
           setState(() {
             _role = 'user';
             _firstVisit = false;
+            // Слушатель списка умирает вместе с сессией: Firebase отзывает
+            // подписку при выходе. Если оставить его в поле, следующий вход
+            // подпишется на уже мёртвый поток — данные не придут никогда,
+            // и на экране навсегда останется «Подключаемся к базе...».
+            // Поэтому обнуляем: при следующем входе создастся новый.
+            _usersStream = null;
           });
         }
       } else {
@@ -197,7 +203,10 @@ class _FirebaseTabState extends State<FirebaseTab> {
   }
 
   Future<void> _signOut() async {
-    setState(() => _social = null);
+    setState(() {
+      _social = null;
+      _usersStream = null;
+    });
     await _auth.signOut();
   }
 
@@ -215,7 +224,7 @@ class _FirebaseTabState extends State<FirebaseTab> {
       for (final p in user.providerData) p.email,
     ];
     for (final name in candidates) {
-      if (name != null && name.isNotEmpty) return name;
+      if (name != null && name.isNotEmpty) return emailToLogin(name);
     }
     return user.isAnonymous ? 'Гость' : 'Вы вошли';
   }
@@ -318,15 +327,15 @@ class _FirebaseTabState extends State<FirebaseTab> {
   Widget _loginScreen() {
     return LoginScreen(
       title: 'Вход через Firebase',
-      onSignIn: (email, password) => _friendly(
+      onSignIn: (login, password) => _friendly(
         () => _auth.signInWithEmailAndPassword(
-          email: email,
+          email: loginToEmail(login),
           password: password,
         ),
       ),
-      onSignUp: (email, password) => _friendly(
+      onSignUp: (login, password) => _friendly(
         () => _auth.createUserWithEmailAndPassword(
-          email: email,
+          email: loginToEmail(login),
           password: password,
         ),
       ),

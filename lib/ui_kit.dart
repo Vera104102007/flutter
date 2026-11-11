@@ -7,6 +7,31 @@ void showMessage(BuildContext context, String text) {
     ..showSnackBar(SnackBar(content: Text(text)));
 }
 
+/// Технический домен для входа по логину.
+///
+/// И Supabase, и Firebase умеют принимать только адрес почты: просто
+/// «vera» они отвергают с ошибкой «invalid format». Поэтому если человек
+/// ввёл логин без собаки, приложение само дописывает к нему этот домен.
+/// Снаружи это выглядит как обычный вход по логину, а для базы остаётся
+/// корректным адресом.
+///
+/// Домен `example.com` выбран не случайно: он зарезервирован стандартом
+/// как раз для примеров и тестов, и Supabase его принимает. Выдуманные
+/// вроде `users.local` он отвергает — это проверено.
+const String loginDomain = 'example.com';
+
+/// Логин или почта → адрес, который поймёт база.
+String loginToEmail(String input) {
+  final value = input.trim();
+  return value.contains('@') ? value : '$value@$loginDomain';
+}
+
+/// Обратное преобразование: показываем логин без технического домена.
+String emailToLogin(String? email) {
+  if (email == null || email.isEmpty) return '';
+  return email.endsWith('@$loginDomain') ? email.split('@').first : email;
+}
+
 /// Ошибка с понятным текстом: в сообщении показывается только текст,
 /// без служебного слова Exception.
 class AuthMessage implements Exception {
@@ -82,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _email.text.trim();
     final password = _password.text.trim();
     if (email.isEmpty || password.isEmpty) {
-      showMessage(context, 'Заполните email и пароль');
+      showMessage(context, 'Заполните логин и пароль');
       return;
     }
     _run(() => action(email, password));
@@ -111,7 +136,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: 'Email',
+                  labelText: 'Логин или email',
+                  helperText: 'Можно просто логин, например vera',
                   border: OutlineInputBorder(),
                 ),
               ),

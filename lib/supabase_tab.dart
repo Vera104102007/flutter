@@ -128,8 +128,11 @@ class _SupabaseTabState extends State<SupabaseTab> {
 
   // ───────── Вход и выход ─────────
 
-  Future<void> _signUp(String email, String password) async {
-    final result = await _db.auth.signUp(email: email, password: password);
+  Future<void> _signUp(String login, String password) async {
+    final result = await _db.auth.signUp(
+      email: loginToEmail(login),
+      password: password,
+    );
     // Если в настройках Supabase включено подтверждение почты,
     // сессии сразу не будет — нужно перейти по ссылке из письма.
     if (result.session == null && mounted) {
@@ -177,7 +180,9 @@ class _SupabaseTabState extends State<SupabaseTab> {
     final user = _session!.user;
     final meta = user.userMetadata ?? const <String, dynamic>{};
     final name = meta['full_name'] ?? meta['user_name'] ?? meta['name'];
-    return '${name ?? user.email ?? 'Вы вошли'}';
+    if (name != null) return '$name';
+    final login = emailToLogin(user.email);
+    return login.isEmpty ? 'Вы вошли' : login;
   }
 
   @override
@@ -185,8 +190,10 @@ class _SupabaseTabState extends State<SupabaseTab> {
     if (!_signedIn) {
       return LoginScreen(
         title: 'Вход через Supabase',
-        onSignIn: (email, password) =>
-            _db.auth.signInWithPassword(email: email, password: password),
+        onSignIn: (login, password) => _db.auth.signInWithPassword(
+          email: loginToEmail(login),
+          password: password,
+        ),
         onSignUp: _signUp,
         social: [
           SocialButton(
