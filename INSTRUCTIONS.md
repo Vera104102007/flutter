@@ -260,40 +260,64 @@ VK ID **не принимает адрес возврата по http** — пр
 об этом, а не непонятную ошибку от ВК. Адрес возврата код подставляет сам
 из текущего адреса страницы, так что в коде менять ничего не нужно.
 
-### Где взять HTTPS
+### Самый короткий путь: Firebase Hosting
 
-Вариантов два, и оба бесплатные.
+**Это одна команда, и никаких настроек в консолях не нужно** — адрес
+`https://flutter-app-982b4.web.app/auth.html` уже прописан в приложении
+ВКонтакте.
 
-**GitHub Pages — тот, что уже почти готов.** Сайт собирается сам при
-каждом пуше (workflow `.github/workflows/htmlpush.yaml`) и лежит по
-адресу `https://vera104102007.github.io/flutter/`.
+```bash
+flutter build web
+```
 
-Тут была поломка: в workflow стояло `--base-href /RMP-Flutter/`, хотя
-репозиторий называется `flutter`. Страница открывалась пустой, потому
-что искала файлы по несуществующему пути — я проверила, `main.dart.js`
-при этом прекрасно лежал по правильному адресу. Исправлено
-на `--base-href /flutter/`, после следующего пуша сайт заработает.
+```bash
+firebase deploy --only hosting
+```
 
-**Firebase Hosting** — запасной вариант, `https://flutter-app-982b4.web.app`.
-Выкладывается командой `flutter build web && firebase deploy --only hosting`.
-Сейчас в настройках ВК прописан именно он.
+Всё подготовлено: раздел `hosting` добавлен в `firebase.json`, сборка
+лежит в `build/web`. Сама я эту команду выполнить не смогла — защита
+не даёт публиковать в интернет без твоего решения, и это правильно.
 
-### Что надо дописать в консолях, чтобы ВК заработал на Pages
+После деплоя открой `https://flutter-app-982b4.web.app` и нажми «Войти
+через ВКонтакте» — там адрес по https, и кнопка должна сработать.
 
-Я не успела — расширение Chrome в тот момент перестало отвечать.
-Все пять шагов — это добавление одного адреса, ничего не удаляется.
+Чтобы на выложенной версии работали ещё и Google с GitHub, нужно
+дописать адрес в двух местах (для ВК это не требуется):
 
 | Где | Что добавить |
 |---|---|
-| [VK ID](https://id.vk.ru/about/business/go) → приложение → Доверенный Redirect URL | `https://vera104102007.github.io/flutter/auth.html` |
-| [Яндекс ID](https://oauth.yandex.ru/client/2f9d7f1bbaed439cb13930b9403fab06) → Redirect URI | то же самое |
-| [Supabase → URL Configuration](https://supabase.com/dashboard/project/cgqhvdqaveelzszcfgtj/auth/url-configuration) → Redirect URLs | `https://vera104102007.github.io/flutter` |
-| [Google Cloud → OAuth-клиент](https://console.cloud.google.com/auth/clients?project=flutter-app-982b4) → Authorized JavaScript origins | `https://vera104102007.github.io` |
-| [Firebase → Authentication → Settings](https://console.firebase.google.com/project/flutter-app-982b4/authentication/settings) → Authorized domains | `vera104102007.github.io` |
+| [Supabase → URL Configuration](https://supabase.com/dashboard/project/cgqhvdqaveelzszcfgtj/auth/url-configuration) → Redirect URLs | `https://flutter-app-982b4.web.app` |
+| [Google Cloud → OAuth-клиент](https://console.cloud.google.com/auth/clients?project=flutter-app-982b4) → Authorized JavaScript origins | `https://flutter-app-982b4.web.app` |
 
-Первые две строки нужны именно для ВК и Яндекса. Остальные три — чтобы
-на выложенной версии работали ещё и Google с GitHub; без них они будут
-работать только на localhost.
+Домен `flutter-app-982b4.web.app` у Firebase разрешён изначально,
+туда дописывать ничего не надо.
+
+### GitHub Pages: почему там пока пусто
+
+Сайт `https://vera104102007.github.io/flutter/` собирается сам при
+каждом пуше, но сейчас показывает README вместо приложения. Причин
+было две.
+
+**Первая — неправильный адрес.** В workflow стояло
+`--base-href /RMP-Flutter/`, хотя репозиторий называется `flutter`.
+Страница открывалась пустой, потому что искала файлы по
+несуществующему пути — хотя сами файлы лежали по правильному.
+Исправлено на `--base-href /flutter/`.
+
+**Вторая — две публикации дерутся за один сайт.** В списке Actions
+видно два процесса: твой `Deploy static content to Pages` (собирает
+Flutter) и встроенный `pages build and deployment` (собирает README
+через Jekyll). Кто финиширует последним, тот и затирает чужой
+результат. Я это поймала: сначала на сайте лежало приложение, после
+следующего пуша — снова README.
+
+Лечится одним переключателем: **Settings → Pages → Build and
+deployment → Source → GitHub Actions**. После этого Jekyll перестанет
+запускаться, и сайт будет собирать только твой workflow.
+
+Если выберешь Pages вместо Firebase Hosting, в ВК и Яндексе надо будет
+дописать адрес `https://vera104102007.github.io/flutter/auth.html`,
+а в Supabase и Google — `https://vera104102007.github.io`.
 
 ## 6. Как устроен вход через ВК и Яндекс
 
