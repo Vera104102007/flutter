@@ -149,8 +149,10 @@ class _SupabaseTabState extends State<SupabaseTab> {
   Future<void> _oauth(OAuthProvider provider) async {
     await _db.auth.signInWithOAuth(
       provider,
+      // Возвращаться надо на саму страницу приложения вместе с папкой:
+      // на GitHub Pages оно лежит в /flutter/, а не в корне сайта.
       redirectTo: kIsWeb
-          ? Uri.base.origin
+          ? SocialAuth.appBaseUrl
           : 'io.supabase.myfirstflutterapp://login-callback/',
     );
   }

@@ -29,11 +29,29 @@ class SocialAuth {
   static const String yandexClientId = '2f9d7f1bbaed439cb13930b9403fab06';
   static const String vkClientId = '54889826';
 
+  /// Адрес самого приложения вместе с папкой, в которой оно лежит.
+  ///
+  /// Одного имени домена мало. На Firebase Hosting приложение лежит
+  /// в корне сайта, а на GitHub Pages — в папке `/flutter/`. Если
+  /// вернуть пользователя просто на `https://vera104102007.github.io`,
+  /// он попадёт на главную страницу GitHub, а не в приложение.
+  static String get appBaseUrl {
+    final uri = Uri.base;
+    final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    // Последний кусок может быть именем файла (index.html, auth.html) —
+    // он к папке не относится.
+    if (segments.isNotEmpty && segments.last.contains('.')) {
+      segments.removeLast();
+    }
+    final path = segments.isEmpty ? '/' : '/${segments.join('/')}/';
+    return '${uri.origin}$path';
+  }
+
   /// Адрес, на который сервис возвращает пользователя после входа.
-  /// В браузере это страница web/auth.html нашего же сайта,
+  /// В браузере это страница auth.html нашего же сайта,
   /// на телефоне — ссылка вида myapp://callback.
   static String get redirectUri =>
-      kIsWeb ? '${Uri.base.origin}/auth.html' : 'myapp://callback';
+      kIsWeb ? '${appBaseUrl}auth.html' : 'myapp://callback';
 
   static String get _scheme => kIsWeb ? 'http' : 'myapp';
 
