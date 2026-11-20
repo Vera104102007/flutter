@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'check_screen.dart';
 import 'firebase_options.dart';
 import 'firebase_tab.dart';
 import 'supabase_tab.dart';
@@ -41,6 +42,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
       home: HomeShell(firebaseReady: firebaseReady),
+      // Именованные пути: по строке-имени Navigator находит, какой
+      // экран построить. Удобно тем, что экран можно открыть из любого
+      // места приложения, не создавая его класс руками.
+      routes: {
+        checkRoute: (context) => const CheckScreen(),
+      },
     );
   }
 }
@@ -69,6 +76,14 @@ class _HomeShellState extends State<HomeShell> {
         ),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          // Переход на второй экран по именованному пути.
+          IconButton(
+            onPressed: () => Navigator.pushNamed(context, checkRoute),
+            icon: const Icon(Icons.network_check),
+            tooltip: 'Проверка связи',
+          ),
+        ],
       ),
       // IndexedStack держит обе вкладки живыми:
       // вход не сбрасывается при переключении между ними.

@@ -3,10 +3,12 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="?android:colorBackground" />
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+    <!-- Иконка приложения вместо пустого экрана на время запуска.
+         Берём ту же картинку, что стоит на иконке запуска (launcher icon):
+         @mipmap/ic_launcher уже лежит в проекте, отдельный файл не нужен. -->
+    <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+            android:src="@mipmap/ic_launcher" />
+    </item>
 </layer-list>
